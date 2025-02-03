@@ -65,6 +65,10 @@ def coletar_links_jogos():
         links = []
         for jogo in jogos:
             try:
+                if jogo.find_elements(By.CLASS_NAME, "fgUtAL"):
+                    print("Jogo ignorado, adiado.")
+                    continue
+
                 ActionChains(driver).move_to_element(jogo).click().perform()
 
                 # Aguarda a div de informações preliminares carregar
@@ -147,21 +151,29 @@ def processar_jogo(link):
 # Função para navegar para a página anterior (rodada anterior)
 def navegar_para_pagina_anterior():
     try:
+        parent = driver.find_element(By.CLASS_NAME, 'gURdCf')
+
+        children = parent.find_elements(By.XPATH, './*')
+
+        if children and children[0].is_displayed():
+            # Clica no botão de voltar
+            ActionChains(driver).move_to_element(children[0]).click().perform()
+
+            # Aguarda a página recarregar
+            time.sleep(3)
+
+            return True
+        else:
+            return False
         # Encontra o botão de voltar
-        botao_voltar = driver.find_element(By.CSS_SELECTOR, 'button.Button.iCnTrv')
-
-        # Clica no botão de voltar
-        ActionChains(driver).move_to_element(botao_voltar).click().perform()
-
-        # Aguarda a página recarregar
-        time.sleep(3)
+        #botao_voltar = driver.find_element(By.CSS_SELECTOR, 'button.Button.iCnTrv')
 
     except Exception as e:
         print(f"Erro ao navegar para a página anterior: {e}")
 
 
 # Abrindo a página
-url = 'https://www.sofascore.com/pt/torneio/futebol/brazil/brasileirao-serie-a/325#id:58766'
+url = 'https://www.sofascore.com/pt/torneio/futebol/brazil/carioca/92#id:56974'
 driver.get(url)
 
 nome = "Campeonato Brasileiro"
@@ -173,8 +185,8 @@ banco.criar_banco(nome_banco)
 
 database = banco.sqlite3.connect(f'bancos/{nome_banco}.db')
 
-if tipo == 1:
-    coletar_classificacao(nome, ano, 1, database)
+#if tipo == 1:
+#    coletar_classificacao(nome, ano, 1, database)
 
 # Loop para navegar pelas rodadas
 while True:
@@ -183,9 +195,11 @@ while True:
 
     # Tenta navegar para a página anterior
     try:
-        navegar_para_pagina_anterior()
+        if not navegar_para_pagina_anterior():
+            print("Não há mais rodadas anteriores.")
+            break
     except:
-        print("Não há mais rodadas anteriores.")
+        print("ERRO - Não há mais rodadas anteriores.")
         break
 
 print(len(links_jogos))
