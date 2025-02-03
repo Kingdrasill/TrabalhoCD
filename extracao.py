@@ -9,7 +9,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
 import time
-import requests
+import re
 
 # Configurando a saída padrão para UTF-8
 sys.stdout.reconfigure(encoding='utf-8')
@@ -90,63 +90,6 @@ def coletar_links_jogos(links):
         print(f"Erro ao coletar links dos jogos: {e}")
         return []
 
-def processar_jogo(link):
-    try:
-        # Abre o link em uma nova aba
-        driver.execute_script("window.open('');")  # Abre uma nova aba
-        driver.switch_to.window(driver.window_handles[1])  # Muda para a nova aba
-        driver.get(link)  # Navega para o link do jogo
-
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        # Seletores para os dados do jogo
-        dados_jogo = {
-            "posse_mandante": None,
-            "posse_visitante": None,
-            "finalizacoes_mandante": None,
-            "finalizacoes_visitante": None,
-            "faltas_mandante": None,
-            "faltas_visitante": None,
-            "escanteios_mandante": None,
-            "escanteios_visitante": None
-        }
-
-        # Define os textos-alvo que vamos buscar
-        estatisticas_interesse = ["Finalizações", "Faltas", "Escanteios", "Posse de bola"]
-        
-        dados_jogo = {}
-
-        for estatistica in estatisticas_interesse:
-            # Busca por elementos que contenham o texto da estatística
-            elemento_estatistica = soup.find(lambda tag: tag.name == "span" and estatistica in tag.text)
-
-            if elemento_estatistica:
-                # Subir até o pai do pai para encontrar a estrutura completa
-                elemento_completo = elemento_estatistica.find_parent("div").find_parent("div")
-                
-                # Extrair os valores (times à esquerda e à direita)
-                valores = elemento_completo.find_all("span", class_="Text")
-                
-                if len(valores) >= 3:
-                    valor_esquerda = valores[0].text.strip()
-                    valor_direita = valores[2].text.strip()
-                    print(f"{estatistica}: {valor_esquerda} - {valor_direita}")
-                else:
-                    print(f"Erro ao extrair valores para {estatistica}")
-            else:
-                print(f"Estatística '{estatistica}' não encontrada.")
-
-        return dados_jogo
-
-    except Exception as e:
-        print(f"Erro ao processar o jogo {link}: {e}")
-
-    finally:
-        # Fecha a aba do jogo e volta para a aba principal
-        driver.close()
-        driver.switch_to.window(driver.window_handles[0])  # Volta para a aba principal
-
 # Função para navegar para a página anterior (rodada anterior)
 def navegar_para_pagina_anterior():
     try:
@@ -164,57 +107,164 @@ def navegar_para_pagina_anterior():
             return True
         else:
             return False
-        # Encontra o botão de voltar
-        #botao_voltar = driver.find_element(By.CSS_SELECTOR, 'button.Button.iCnTrv')
 
     except Exception as e:
         print(f"Erro ao navegar para a página anterior: {e}")
 
+def pegar_gols_e_cartoes(lista_eventos, dados_jogo):
+    dados_jogo["gols_mandante"] = []
+    dados_jogo["gols_visitante"] = []
+    dados_jogo["cartoes_mandante"] = []
+    dados_jogo["cartoes_visitante"] = []
 
-# Abrindo a página
-url = 'https://www.sofascore.com/pt/torneio/futebol/brazil/brasileirao-serie-a/325#id:58766'
-#url = "https://www.sofascore.com/pt/torneio/futebol/germany/bundesliga/35#id:52608"
-driver.get(url)
+    aux_tags = ["Gol", "Pênalti", "Gol contra", "Cartão amarelo", "Cartão vermelho"]
 
-nome = "Campeonato Brasileiro"
-ano = 2024
-tipo = 1
-nome_banco = nome + " " + str(ano)
+    for evento in lista_eventos:
+        svg_tag = evento.find('svg')
+        title_tag = svg_tag.find('title') if svg_tag else None
+        title = title_tag.text if title_tag else None 
 
-banco.criar_banco(nome_banco)
+        if title in aux_tags:
+            aux_index = aux_tags.index(title)
 
-database = banco.sqlite3.connect(f'bancos/{nome_banco}.db')
+            tempo_tag = evento.find('div', {'color': 'onSurface.nLv3'})
+            tempo = tempo_tag.text.strip() if tempo_tag else None
+            acrescimos = False
 
-#if tipo == 1:
-#    coletar_classificacao(nome, ano, 1, database)
+            match  = re.match(r"(\d+)'(?:\s*\+\s*(\d+))?", tempo)
 
-links_jogos = []
-# Loop para navegar pelas rodadas
-while True:
-    # Coleta os links dos jogos da rodada atual
-    coletar_links_jogos(links_jogos)
-    print(len(links_jogos))
-    # Tenta navegar para a página anterior
+            primeiro_numero = int(match.group(1))
+            segundo_numero = int(match.group(2)) if match.group(2) else 0
+            acrescimos = True if match.group(2) else False
+
+            tempo_total = primeiro_numero + segundo_numero
+
+            mandante = False
+            flex_container = evento.find('div', {'class': 'Box Flex dtqDoQ iZgchw'})
+            if flex_container:
+                direction = flex_container.get('direction', '')
+                if direction == 'row':
+                    mandante = True
+
+            if aux_index <= 2:
+                if mandante:
+                    dados_jogo["gols_mandante"].append([aux_tags[aux_index],tempo_total,acrescimos])
+                else:
+                    dados_jogo["gols_visitante"].append([aux_tags[aux_index],tempo_total,acrescimos])
+            else:
+                if mandante:
+                    dados_jogo["cartoes_mandante"].append([aux_tags[aux_index],tempo_total,acrescimos])
+                else:
+                    dados_jogo["cartoes_visitante"].append([aux_tags[aux_index],tempo_total,acrescimos])
+
+def extrair_nome_time(div_time):
+    bdi_tag = div_time.find('bdi', {'class': 'Text fIvzGZ'})
+    if bdi_tag:
+        return bdi_tag.text.strip()
+    return None
+
+def processar_jogo(link, times_dict):
     try:
-        if not navegar_para_pagina_anterior():
-            print("Não há mais rodadas anteriores.")
+        # Abre o link em uma nova aba
+        driver.get(link)  # Navega para o link do jogo
+
+        soup = BeautifulSoup(driver.page_source, "html.parser")
+
+        dados_jogo = {}
+
+        # IDs
+        div_mandante = soup.find('div', {'data-testid': 'left_team'})
+        div_visitante = soup.find('div', {'data-testid': 'right_team'})
+
+        nome_mandante = extrair_nome_time(div_mandante)
+        nome_visitante = extrair_nome_time(div_visitante)
+        
+        dados_jogo["id_mandante"] = times_dict.get(nome_mandante)
+        dados_jogo["id_visitante"] = times_dict.get(nome_visitante)
+
+        # Data
+        div_data = soup.find('div', {'class': 'Box bdIVoF'})
+
+        if div_data:
+            # Extrai o texto da div
+            texto_data = div_data.text.strip()
+            
+            # Remove espaços extras e formata (se necessário)
+            dados_jogo["data"] = texto_data.replace('\n', '').replace(' ', '')
+
+        # Parte de gols e cartões
+        container = soup.find("div", class_="Box fTPNOD")
+        filhos_desejados = container.find_all("div", class_="Box cbmnyx")
+        lista_filhos = [filho for filho in filhos_desejados]
+        pegar_gols_e_cartoes(lista_filhos, dados_jogo)
+
+        estatisticas_interesse = ["Finalizações", "Faltas", "Escanteios", "Posse de bola"]
+
+        estatisticas_divs = soup.find_all("div", class_="Box Flex heNsMA bnpRyo")
+        for div in estatisticas_divs:
+            filhos = div.find_all(recursive=False)
+
+            if len(filhos) >= 3:
+                valor_esquerda = filhos[0].get_text(strip=True)
+                estatistica_nome = filhos[1].get_text(strip=True)
+                valor_direita = filhos[2].get_text(strip=True)
+                if estatistica_nome in estatisticas_interesse:
+                    if estatistica_nome == "Finalizações":
+                        dados_jogo["finalizacoes_mandante"] = int(valor_esquerda)
+                        dados_jogo["finalizacoes_visitante"] = int(valor_direita)
+                    elif estatistica_nome == "Faltas":
+                        dados_jogo["faltas_mandante"] = int(valor_esquerda)
+                        dados_jogo["faltas_visitante"] = int(valor_direita)
+                    elif estatistica_nome == "Escanteios":
+                        dados_jogo["escanteios_mandante"] = int(valor_esquerda)
+                        dados_jogo["escanteios_visitante"] = int(valor_direita)
+                    elif estatistica_nome == "Posse de bola":
+                        dados_jogo["posse_mandante"] = int(valor_esquerda.strip('%'))
+                        dados_jogo["posse_visitante"] = int(valor_direita.strip('%'))
+        return dados_jogo
+
+    except Exception as e:
+        print(f"Erro ao processar o jogo {link}: {e}")
+
+def extrair_campeonato(link, nome, ano, tipo):
+    nome_banco = nome + " " + str(ano)
+    banco.criar_banco(nome_banco)
+    driver.get(link)
+    database = banco.sqlite3.connect(f'bancos/{nome_banco}.db')
+    cursor = database.cursor()
+    if tipo == 1:
+        coletar_classificacao(nome, ano, 1, database)
+    links_jogos = []
+    while True:
+        # Coleta os links dos jogos da rodada atual
+        coletar_links_jogos(links_jogos)
+        print(len(links_jogos))
+        # Tenta navegar para a página anterior
+        try:
+            if not navegar_para_pagina_anterior():
+                print("Não há mais rodadas anteriores.")
+                break
+        except:
+            print("ERRO - Não há mais rodadas anteriores.")
             break
-    except:
-        print("ERRO - Não há mais rodadas anteriores.")
-        break
 
-print(len(links_jogos))
-# Processa cada jogo
-# for link in links_jogos:
-#     processar_jogo(link)
-#     break
+    file_path = f"arquivos/{nome}_{str(ano)}.txt"
 
-driver.quit()
+    # Salvar cada item do vetor em uma linha do arquivo
+    with open(file_path, "w", encoding='utf-8') as file:
+        for item in links_jogos:
+            file.write(item + "\n")
+    
+    cursor.execute('SELECT id, nome FROM times')
+    times_dict = {}
 
-# times = cursor.execute('''
-#     SELECT * FROM times
-# ''')
+    for row in cursor.fetchall():
+        id_time = row[0]  # O ID do time está na primeira coluna
+        nome_time = row[1]  # O nome do time está na segunda coluna
+        times_dict[nome_time] = id_time
 
-# for i in times:
-#     print(i)
-
+    for link in links_jogos:
+        dados_jogo = processar_jogo(link, times_dict)
+        print(dados_jogo)
+        banco.salvar_jogo_no_banco(dados_jogo,database)
+    driver.quit()
