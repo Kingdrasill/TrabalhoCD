@@ -52,7 +52,7 @@ def coletar_classificacao(nome, ano, tipo, database):
 
     database.commit()
 
-def coletar_links_jogos():
+def coletar_links_jogos(links):
     try:
         # Aguarda a div dos jogos carregar
         WebDriverWait(driver, 10).until(
@@ -62,13 +62,8 @@ def coletar_links_jogos():
         # Encontra todos os jogos na div
         jogos = driver.find_elements(By.CLASS_NAME, "Box.klGMtt.sc-efac74ba-1.kugaRD")
 
-        links = []
         for jogo in jogos:
             try:
-                if jogo.find_elements(By.CLASS_NAME, "fgUtAL"):
-                    print("Jogo ignorado, adiado.")
-                    continue
-
                 ActionChains(driver).move_to_element(jogo).click().perform()
 
                 # Aguarda a div de informações preliminares carregar
@@ -78,14 +73,18 @@ def coletar_links_jogos():
                 # mostrar_mais = driver.find_element(By.CSS_SELECTOR, 'a[data-testid="show_more"] button')
                 # print(mostrar_mais)
                 # link = mostrar_mais.get_attribute("href")
-                mostrar_mais = driver.find_element(By.CSS_SELECTOR, '[data-testid="show_more"]')
-                link = mostrar_mais.get_attribute("href")
-                links.append(link)
+
+                div = driver.find_element(By.CLASS_NAME, 'dUMdHh')
+                
+                if "Adiado" in div.text:
+                    print("teste")
+                else:
+                    mostrar_mais = driver.find_element(By.CSS_SELECTOR, '[data-testid="show_more"]')
+                    link = mostrar_mais.get_attribute("href")
+                    links.append(link)
             except Exception as e:
                 print(f"Erro ao coletar link de um jogo: {e}")
                 continue
-
-        return links
 
     except Exception as e:
         print(f"Erro ao coletar links dos jogos: {e}")
@@ -173,7 +172,8 @@ def navegar_para_pagina_anterior():
 
 
 # Abrindo a página
-url = 'https://www.sofascore.com/pt/torneio/futebol/brazil/carioca/92#id:56974'
+url = 'https://www.sofascore.com/pt/torneio/futebol/brazil/brasileirao-serie-a/325#id:58766'
+#url = "https://www.sofascore.com/pt/torneio/futebol/germany/bundesliga/35#id:52608"
 driver.get(url)
 
 nome = "Campeonato Brasileiro"
@@ -188,11 +188,12 @@ database = banco.sqlite3.connect(f'bancos/{nome_banco}.db')
 #if tipo == 1:
 #    coletar_classificacao(nome, ano, 1, database)
 
+links_jogos = []
 # Loop para navegar pelas rodadas
 while True:
     # Coleta os links dos jogos da rodada atual
-    links_jogos = coletar_links_jogos()
-
+    coletar_links_jogos(links_jogos)
+    print(len(links_jogos))
     # Tenta navegar para a página anterior
     try:
         if not navegar_para_pagina_anterior():
