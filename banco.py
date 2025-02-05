@@ -144,3 +144,10 @@ def salvar_jogo_no_banco(dados_jogo, conn):
     except Exception as e:
         conn.rollback()  # Desfaz as alterações em caso de erro
         print(f"Erro ao salvar os dados do jogo: {e}")
+
+def get_id_time(nome_time, cursor):
+    cursor.execute(f"""
+        SELECT id FROM times
+            WHERE nome = '{nome_time}'
+    """)
+    return cursor.fetchone()

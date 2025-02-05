@@ -73,15 +73,13 @@ def coletar_links_jogos(links):
                 # mostrar_mais = driver.find_element(By.CSS_SELECTOR, 'a[data-testid="show_more"] button')
                 # print(mostrar_mais)
                 # link = mostrar_mais.get_attribute("href")
-
-                div = driver.find_element(By.CLASS_NAME, 'dUMdHh')
                 
-                if "Adiado" in div.text:
-                    print("teste")
-                else:
+                if not driver.find_elements(By.CLASS_NAME, 'Text.dRRggn'):
                     mostrar_mais = driver.find_element(By.CSS_SELECTOR, '[data-testid="show_more"]')
                     link = mostrar_mais.get_attribute("href")
                     links.append(link)
+                else:
+                    print("Adiado")
             except Exception as e:
                 print(f"Erro ao coletar link de um jogo: {e}")
                 continue
@@ -99,7 +97,10 @@ def navegar_para_pagina_anterior():
 
         if children and children[0].is_displayed():
             # Clica no botão de voltar
-            ActionChains(driver).move_to_element(children[0]).click().perform()
+            WebDriverWait(driver, 10).until(EC.element_to_be_clickable(children[0]))
+
+            # Click using JavaScript to avoid unwanted navigation
+            driver.execute_script("arguments[0].click();", children[0])
 
             # Aguarda a página recarregar
             time.sleep(3)
@@ -167,6 +168,9 @@ def processar_jogo(link, times_dict):
     try:
         # Abre o link em uma nova aba
         driver.get(link)  # Navega para o link do jogo
+
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'Box.Flex.VhXzF.kGBmhP')))
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'Box.fTPNOD')))
 
         soup = BeautifulSoup(driver.page_source, "html.parser")
 
@@ -267,4 +271,151 @@ def extrair_campeonato(link, nome, ano, tipo):
         dados_jogo = processar_jogo(link, times_dict)
         print(dados_jogo)
         banco.salvar_jogo_no_banco(dados_jogo,database)
+    driver.quit()
+
+def extrair_dados_links(nome, ano):
+    nome_banco = nome + " " + str(ano)
+    file_path = f"arquivos/{nome}_{str(ano)}.txt"
+    database = banco.sqlite3.connect(f'bancos/{nome_banco}.db')
+    cursor = database.cursor()
+
+    tags_auxs = ['Gol', 'Pênalti', 'Gol contra', 'Cartão amarelo', 'Cartão vermelho', '2º cartão amarelo (vermelho)']
+    estatisticas_interesse = ["Finalizações", "Faltas", "Escanteios", "Posse de bola"]
+
+    links_jogos_faltantes = []
+    # Salvar cada item do vetor em uma linha do arquivo
+    with open(file_path, "r", encoding='utf-8') as file:
+        while True:
+            link = file.readline()
+            if link == '':
+                break
+
+            try:
+                driver.get(link)  # Navega para o link do jogo
+
+                WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'Box.Flex.dZNeJi.bnpRyo')))
+
+                soup = BeautifulSoup(driver.page_source, "html.parser")
+
+                dados_jogo = {}
+
+                # IDs
+                div_mandante = soup.find('div', {'data-testid': 'left_team'})
+                div_visitante = soup.find('div', {'data-testid': 'right_team'})
+
+                nome_mandante = extrair_nome_time(div_mandante)
+                nome_visitante = extrair_nome_time(div_visitante)
+
+                id_mandante = banco.get_id_time(nome_mandante, cursor)[0]
+                id_visitante = banco.get_id_time(nome_visitante, cursor)[0]
+
+                cursor.execute(f"""
+                    SELECT id FROM jogos
+                        WHERE id_campeonato = 1 AND id_mandante = {id_mandante} AND id_visitante = {id_visitante}
+                """)
+                id = cursor.fetchone()
+
+                if not id:
+                    WebDriverWait(driver, 50).until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'Box.Flex.heNsMA.bnpRyo')))
+
+                    # Pega os IDs dos times
+                    dados_jogo["id_mandante"] = id_mandante
+                    dados_jogo["id_visitante"] = id_visitante
+                    
+                    # Pega a data do jogo
+                    data = driver.find_element("css selector", "span.Text.hZKSbA")
+                    dados_jogo["data"] = data.text.strip()[:10] + '-' + data.text.strip()[10:]
+
+                    # Pega os cartoes e gols
+                    container = driver.find_element(By.CLASS_NAME, "Box.fTPNOD")
+                    filhos = container.find_elements(By.CLASS_NAME, "Box.cbmnyx")
+
+                    gols_mandante = []
+                    gols_visitante = []
+                    cartoes_mandante = []
+                    cartoes_visitante = []
+                    
+                    for filho in filhos:
+                        direcao = filho.find_element(By.TAG_NAME, 'div').get_attribute('direction')
+                        mandante = False
+                        if direcao == 'row':
+                            mandante = True
+                            
+                        tempo_tag = filho.find_element(By.CSS_SELECTOR, 'div.Text.eySDEN')
+                        evento_tag = filho.find_element(By.TAG_NAME, 'svg').get_attribute('innerHTML')
+
+                        match_title = re.search(r'<title>(.*?)</title>', evento_tag)
+                        if match_title:
+                            evento = match_title.group(1)
+                            if evento in tags_auxs:
+                                index = tags_auxs.index(evento)
+
+                                match_tempo  = re.match(r"(\d+)'(?:\s*\+\s*(\d+))?", tempo_tag.text.strip())
+
+                                primeiro_numero = int(match_tempo.group(1))
+                                segundo_numero = int(match_tempo.group(2)) if match_tempo.group(2) else 0
+                                acrescimos = True if match_tempo.group(2) else False
+
+                                tempo_total = primeiro_numero + segundo_numero
+
+                                if index <= 2:
+                                    if mandante:
+                                        gols_mandante.append([tags_auxs[index],tempo_total,acrescimos])
+                                    else:
+                                        gols_visitante.append([tags_auxs[index],tempo_total,acrescimos])
+                                else:
+                                    if mandante:
+                                        if index != 5:
+                                            cartoes_mandante.append([tags_auxs[index],tempo_total,acrescimos])
+                                        else: 
+                                            cartoes_mandante.append([tags_auxs[4],tempo_total,acrescimos])
+                                    else:
+                                        if index != 5:
+                                            cartoes_visitante.append([tags_auxs[index],tempo_total,acrescimos])
+                                        else: 
+                                            cartoes_visitante.append([tags_auxs[4],tempo_total,acrescimos])
+                    
+                    dados_jogo['gols_mandante'] = gols_mandante
+                    dados_jogo['gols_visitante'] = gols_visitante
+                    dados_jogo['cartoes_mandante'] = cartoes_mandante
+                    dados_jogo['cartoes_visitante'] = cartoes_visitante
+
+                    # Pegar estátisticas importantes
+                    container = soup.find("div", class_="Box fTPNOD")
+
+                    estatisticas_divs = soup.find_all("div", class_="Box Flex heNsMA bnpRyo")
+                    for div in estatisticas_divs:
+                        filhos = div.find_all(recursive=False)
+
+                        if len(filhos) >= 3:
+                            valor_esquerda = filhos[0].get_text(strip=True)
+                            estatistica_nome = filhos[1].get_text(strip=True)
+                            valor_direita = filhos[2].get_text(strip=True)
+                            if estatistica_nome in estatisticas_interesse:
+                                if estatistica_nome == "Finalizações":
+                                    dados_jogo["finalizacoes_mandante"] = int(valor_esquerda)
+                                    dados_jogo["finalizacoes_visitante"] = int(valor_direita)
+                                elif estatistica_nome == "Faltas":
+                                    dados_jogo["faltas_mandante"] = int(valor_esquerda)
+                                    dados_jogo["faltas_visitante"] = int(valor_direita)
+                                elif estatistica_nome == "Escanteios":
+                                    dados_jogo["escanteios_mandante"] = int(valor_esquerda)
+                                    dados_jogo["escanteios_visitante"] = int(valor_direita)
+                                elif estatistica_nome == "Posse de bola":
+                                    dados_jogo["posse_mandante"] = int(valor_esquerda.strip('%'))
+                                    dados_jogo["posse_visitante"] = int(valor_direita.strip('%'))
+                    
+                    banco.salvar_jogo_no_banco(dados_jogo,database)
+                else:
+                    print(dados_jogo) 
+                    print("Já está no banco")      
+            except:
+                links_jogos_faltantes.append(link)
+                print("Erro ao buscar os dados")
+                
+
+    with open(file_path, "w", encoding='utf-8') as file:
+        for item in links_jogos_faltantes:
+            file.write(item)
+
     driver.quit()
