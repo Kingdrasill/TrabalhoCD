@@ -8,6 +8,7 @@ import sys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
+from PIL import Image
 import time
 import re
 
@@ -296,7 +297,6 @@ def extrair_dados_links(nome, ano):
                 WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'Box.Flex.dZNeJi.bnpRyo')))
 
                 soup = BeautifulSoup(driver.page_source, "html.parser")
-
                 dados_jogo = {}
 
                 # IDs
@@ -316,8 +316,6 @@ def extrair_dados_links(nome, ano):
                 id = cursor.fetchone()
 
                 if not id:
-                    WebDriverWait(driver, 50).until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'Box.Flex.heNsMA.bnpRyo')))
-
                     # Pega os IDs dos times
                     dados_jogo["id_mandante"] = id_mandante
                     dados_jogo["id_visitante"] = id_visitante
@@ -326,6 +324,7 @@ def extrair_dados_links(nome, ano):
                     data = driver.find_element("css selector", "span.Text.hZKSbA")
                     dados_jogo["data"] = data.text.strip()[:10] + '-' + data.text.strip()[10:]
 
+                    WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'Box.fTPNOD')))
                     # Pega os cartoes e gols
                     container = driver.find_element(By.CLASS_NAME, "Box.fTPNOD")
                     filhos = container.find_elements(By.CLASS_NAME, "Box.cbmnyx")
@@ -336,6 +335,7 @@ def extrair_dados_links(nome, ano):
                     cartoes_visitante = []
                     
                     for filho in filhos:
+                        driver.execute_script("arguments[0].scrollIntoView();", filho)
                         direcao = filho.find_element(By.TAG_NAME, 'div').get_attribute('direction')
                         mandante = False
                         if direcao == 'row':
@@ -380,39 +380,42 @@ def extrair_dados_links(nome, ano):
                     dados_jogo['cartoes_mandante'] = cartoes_mandante
                     dados_jogo['cartoes_visitante'] = cartoes_visitante
 
+                    soup = BeautifulSoup(driver.page_source, "html.parser")
                     # Pegar estátisticas importantes
-                    container = soup.find("div", class_="Box fTPNOD")
+                    WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'Box.kZtOTB')))
+                    estatisticas_divs = driver.find_elements(By.CLASS_NAME, 'Box.Flex.heNsMA.bnpRyo')
+                    estatisticas_copia = estatisticas_interesse.copy()
 
-                    estatisticas_divs = soup.find_all("div", class_="Box Flex heNsMA bnpRyo")
-                    for div in estatisticas_divs:
-                        filhos = div.find_all(recursive=False)
+                    for estatistica in estatisticas_divs:
+                        driver.execute_script("arguments[0].scrollIntoView();", estatistica)
+                        estatistica_valores = estatistica.find_elements(By.TAG_NAME, 'bdi')
 
-                        if len(filhos) >= 3:
-                            valor_esquerda = filhos[0].get_text(strip=True)
-                            estatistica_nome = filhos[1].get_text(strip=True)
-                            valor_direita = filhos[2].get_text(strip=True)
-                            if estatistica_nome in estatisticas_interesse:
-                                if estatistica_nome == "Finalizações":
-                                    dados_jogo["finalizacoes_mandante"] = int(valor_esquerda)
-                                    dados_jogo["finalizacoes_visitante"] = int(valor_direita)
-                                elif estatistica_nome == "Faltas":
-                                    dados_jogo["faltas_mandante"] = int(valor_esquerda)
-                                    dados_jogo["faltas_visitante"] = int(valor_direita)
-                                elif estatistica_nome == "Escanteios":
-                                    dados_jogo["escanteios_mandante"] = int(valor_esquerda)
-                                    dados_jogo["escanteios_visitante"] = int(valor_direita)
-                                elif estatistica_nome == "Posse de bola":
-                                    dados_jogo["posse_mandante"] = int(valor_esquerda.strip('%'))
-                                    dados_jogo["posse_visitante"] = int(valor_direita.strip('%'))
+                        valor_esquerda = estatistica_valores[0].text.strip()
+                        estatistica_nome = estatistica_valores[1].text.strip()
+                        valor_direita = estatistica_valores[2].text.strip()
+                        
+                        if estatistica_nome in estatisticas_copia:
+                            estatisticas_copia.remove(estatistica_nome)
+
+                            if estatistica_nome == "Finalizações":
+                                dados_jogo["finalizacoes_mandante"] = int(valor_esquerda)
+                                dados_jogo["finalizacoes_visitante"] = int(valor_direita)
+                            elif estatistica_nome == "Faltas":
+                                dados_jogo["faltas_mandante"] = int(valor_esquerda)
+                                dados_jogo["faltas_visitante"] = int(valor_direita)
+                            elif estatistica_nome == "Escanteios":
+                                dados_jogo["escanteios_mandante"] = int(valor_esquerda)
+                                dados_jogo["escanteios_visitante"] = int(valor_direita)
+                            elif estatistica_nome == "Posse de bola":
+                                dados_jogo["posse_mandante"] = int(valor_esquerda.strip('%'))
+                                dados_jogo["posse_visitante"] = int(valor_direita.strip('%'))
                     
                     banco.salvar_jogo_no_banco(dados_jogo,database)
                 else:
-                    print(dados_jogo) 
                     print("Já está no banco")      
             except:
                 links_jogos_faltantes.append(link)
-                print("Erro ao buscar os dados")
-                
+                print("Erro ao buscar os dados")   
 
     with open(file_path, "w", encoding='utf-8') as file:
         for item in links_jogos_faltantes:
