@@ -19,9 +19,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 chrome_options = Options()
 chrome_options.add_argument("--start-maximized")
 
-driver = webdriver.Chrome(options=chrome_options)
-
-def coletar_classificacao(nome, ano, tipo, database):
+def coletar_classificacao(driver, nome, ano, tipo, database):
     cursor = database.cursor()
 
     cursor.execute('''
@@ -53,7 +51,7 @@ def coletar_classificacao(nome, ano, tipo, database):
 
     database.commit()
 
-def coletar_links_jogos(links):
+def coletar_links_jogos(driver, links):
     try:
         # Aguarda a div dos jogos carregar
         WebDriverWait(driver, 10).until(
@@ -90,7 +88,7 @@ def coletar_links_jogos(links):
         return []
 
 # Função para navegar para a página anterior (rodada anterior)
-def navegar_para_pagina_anterior():
+def navegar_para_pagina_anterior(driver):
     try:
         parent = driver.find_element(By.CLASS_NAME, 'gURdCf')
 
@@ -116,18 +114,20 @@ def navegar_para_pagina_anterior():
 def extrair_campeonato(link, nome, ano, tipo):
     nome_banco = nome + " " + str(ano)
     banco.criar_banco(nome_banco)
+
+    driver = webdriver.Chrome(options=chrome_options)
     driver.get(link)
     database = banco.sqlite3.connect(f'bancos/{nome_banco}.db')
     cursor = database.cursor()
     if tipo == 1:
-        coletar_classificacao(nome, ano, 1, database)
+        coletar_classificacao(driver, nome, ano, 1, database)
     links_jogos = []
     while True:
         # Coleta os links dos jogos da rodada atual
-        coletar_links_jogos(links_jogos)
+        coletar_links_jogos(driver, links_jogos)
         # Tenta navegar para a página anterior
         try:
-            if not navegar_para_pagina_anterior():
+            if not navegar_para_pagina_anterior(driver):
                 print("Não há mais rodadas anteriores.")
                 break
         except:
@@ -155,6 +155,7 @@ def extrair_dados_links(nome, ano):
     database = banco.sqlite3.connect(f'bancos/{nome_banco}.db')
     cursor = database.cursor()
 
+    driver = webdriver.Chrome(options=chrome_options)
     tags_auxs = ['Gol', 'Pênalti', 'Gol contra', 'Cartão amarelo', 'Cartão vermelho', '2º cartão amarelo (vermelho)']
     estatisticas_interesse = ["Finalizações", "Faltas", "Escanteios", "Posse de bola"]
 
