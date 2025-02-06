@@ -58,8 +58,9 @@ def coletar_links_jogos(driver, links):
             EC.presence_of_element_located((By.CLASS_NAME, "Box.kiSsvW"))
         )
 
+        div = driver.find_element(By.CLASS_NAME, "Box.kiSsvW")
         # Encontra todos os jogos na div
-        jogos = driver.find_elements(By.CLASS_NAME, "Box.klGMtt.sc-efac74ba-1.kugaRD")
+        jogos = div.find_elements(By.CLASS_NAME, "Box.klGMtt.sc-efac74ba-1.kugaRD")
 
         for jogo in jogos:
             try:
@@ -69,18 +70,10 @@ def coletar_links_jogos(driver, links):
                 WebDriverWait(driver, 10).until(
                     EC.presence_of_element_located((By.CLASS_NAME, "Box.klGMtt.sc-34673537-0.bYPUQx.widget"))
                 )
-                # mostrar_mais = driver.find_element(By.CSS_SELECTOR, 'a[data-testid="show_more"] button')
-                # print(mostrar_mais)
-                # link = mostrar_mais.get_attribute("href")
-                # soup = BeautifulSoup(driver.page_source, 'html.parser')
-                # soup2 = soup.find('div', class_='Box Flex dZNeJi bnpRyo')
-
-                # team_names = [bdi_tag.text for bdi_tag in soup2.find_all("bdi")]
-
-                # print(team_names)
 
                 if not driver.find_elements(By.CLASS_NAME, 'Text.dRRggn'):
-                    mostrar_mais = driver.find_element(By.CSS_SELECTOR, '[data-testid="show_more"]')
+                    div = driver.find_element(By.CLASS_NAME, "Box.klGMtt.sc-34673537-0.bYPUQx.widget")
+                    mostrar_mais = div.find_element(By.CSS_SELECTOR, '[data-testid="show_more"]')
                     link = mostrar_mais.get_attribute("href")
                     links.append(link)
                 else:
@@ -125,8 +118,8 @@ def extrair_campeonato(link, nome, ano, tipo):
     driver.get(link)
     database = banco.sqlite3.connect(f'bancos/{nome_banco}.db')
     cursor = database.cursor()
-    # if tipo == 1:
-    #     coletar_classificacao(driver, nome, ano, 1, database)
+    if tipo == 1:
+        coletar_classificacao(driver, nome, ano, 1, database)
     links_jogos = []
     while True:
         # Coleta os links dos jogos da rodada atual
@@ -189,16 +182,35 @@ def extrair_dados_links(nome, ano):
                     nome_mandante = extrair_nome_time(div_mandante)
                     nome_visitante = extrair_nome_time(div_visitante)
 
+                    novo = False
+
                     id_mandante = banco.get_id_time(nome_mandante, cursor)[0]
+                    if not id_mandante:
+                        cursor.execute('''
+                            INSERT INTO times (nome)
+                            VALUES (?)
+                        ''', (str(nome_mandante),))
+                        id_mandante = cursor.lastrowid
+                        database.commit()
+                        novo = True
                     id_visitante = banco.get_id_time(nome_visitante, cursor)[0]
+                    if not id_visitante:
+                        cursor.execute('''
+                            INSERT INTO times (nome)
+                            VALUES (?)
+                        ''', (str(nome_visitante),))
+                        id_visitante = cursor.lastrowid
+                        database.commit()
+                        novo = True
 
-                    cursor.execute(f"""
-                        SELECT id FROM jogos
-                            WHERE id_campeonato = 1 AND id_mandante = {id_mandante} AND id_visitante = {id_visitante}
-                    """)
-                    id = cursor.fetchone()
+                    if not novo:
+                        cursor.execute(f"""
+                            SELECT id FROM jogos
+                                WHERE id_campeonato = 1 AND id_mandante = {id_mandante} AND id_visitante = {id_visitante}
+                        """)
+                        id = cursor.fetchone()
 
-                    if not id:
+                    if (not id) or novo:
                         # Pega os IDs dos times
                         dados_jogo["id_mandante"] = id_mandante
                         dados_jogo["id_visitante"] = id_visitante
