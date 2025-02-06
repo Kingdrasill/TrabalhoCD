@@ -77,6 +77,20 @@ def criar_banco(nome):
 
 def salvar_jogo_no_banco(dados_jogo, conn):
     try:
+        tem_estatisticas = any([
+            dados_jogo.get('faltas_mandante'),
+            dados_jogo.get('posse_mandante'),
+            dados_jogo.get('finalizacoes_mandante'),
+            dados_jogo.get('escanteios_mandante'),
+            dados_jogo.get('faltas_visitante'),
+            dados_jogo.get('posse_visitante'),
+            dados_jogo.get('finalizacoes_visitante'),
+            dados_jogo.get('escanteios_visitante')
+        ])
+
+        if not tem_estatisticas:
+            raise ValueError("Nenhuma estatística relevante encontrada para salvar o jogo.")
+    
         cursor = conn.cursor()
 
         # Inserir dados na tabela jogos
@@ -89,10 +103,17 @@ def salvar_jogo_no_banco(dados_jogo, conn):
         ''', (
             1,  # id_campeonato (fixo como 1)
             dados_jogo['id_mandante'], dados_jogo['id_visitante'],
-            dados_jogo['faltas_mandante'], dados_jogo['posse_mandante'], dados_jogo['finalizacoes_mandante'], dados_jogo['escanteios_mandante'],
-            dados_jogo['faltas_visitante'], dados_jogo['posse_visitante'], dados_jogo['finalizacoes_visitante'], dados_jogo['escanteios_visitante'],
+            dados_jogo.get('faltas_mandante', -1),
+            dados_jogo.get('posse_mandante', -1),
+            dados_jogo.get('finalizacoes_mandante', -1),
+            dados_jogo.get('escanteios_mandante', -1),
+            dados_jogo.get('faltas_visitante', -1),
+            dados_jogo.get('posse_visitante', -1),
+            dados_jogo.get('finalizacoes_visitante', -1),
+            dados_jogo.get('escanteios_visitante', -1),
             dados_jogo['data']
         ))
+
 
         # Obter o ID do jogo inserido
         id_jogo = cursor.lastrowid

@@ -11,6 +11,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 from PIL import Image
 import time
 import re
+import traceback
 
 # Configurando a saída padrão para UTF-8
 sys.stdout.reconfigure(encoding='utf-8')
@@ -112,7 +113,7 @@ def navegar_para_pagina_anterior(driver):
 
 def extrair_campeonato(link, nome, ano, tipo):
     nome_banco = nome + " " + str(ano)
-    # banco.criar_banco(nome_banco)
+    banco.criar_banco(nome_banco)
 
     driver = webdriver.Chrome(options=chrome_options)
     driver.get(link)
@@ -184,8 +185,11 @@ def extrair_dados_links(nome, ano):
 
                     novo = False
 
-                    id_mandante = banco.get_id_time(nome_mandante, cursor)[0]
-                    if not id_mandante:
+                    try:
+                        id_mandante = banco.get_id_time(nome_mandante, cursor)[0]
+                    except Exception as e:
+                        print(f"Erro ao obter ID do mandante {nome_mandante}: {e}")
+                        # traceback.print_exc()
                         cursor.execute('''
                             INSERT INTO times (nome)
                             VALUES (?)
@@ -193,8 +197,11 @@ def extrair_dados_links(nome, ano):
                         id_mandante = cursor.lastrowid
                         database.commit()
                         novo = True
-                    id_visitante = banco.get_id_time(nome_visitante, cursor)[0]
-                    if not id_visitante:
+                    try:
+                        id_visitante = banco.get_id_time(nome_visitante, cursor)[0]
+                    except Exception as e:
+                        print(f"Erro ao obter ID do visitante {nome_visitante}: {e}")
+                        # traceback.print_exc()
                         cursor.execute('''
                             INSERT INTO times (nome)
                             VALUES (?)
@@ -245,20 +252,23 @@ def extrair_dados_links(nome, ano):
                                 if evento in tags_auxs:
                                     index = tags_auxs.index(evento)
 
-                                    match_tempo  = re.match(r"(\d+)'(?:\s*\+\s*(\d+))?", tempo_tag.text.strip())
+                                    try:
+                                        match_tempo  = re.match(r"(\d+)'(?:\s*\+\s*(\d+))?", tempo_tag.text.strip())
 
-                                    primeiro_numero = int(match_tempo.group(1))
-                                    segundo_numero = int(match_tempo.group(2)) if match_tempo.group(2) else 0
-                                    acrescimos = True if match_tempo.group(2) else False
+                                        primeiro_numero = int(match_tempo.group(1))
+                                        segundo_numero = int(match_tempo.group(2)) if match_tempo.group(2) else 0
+                                        acrescimos = True if match_tempo.group(2) else False
 
-                                    tempo_total = primeiro_numero + segundo_numero
+                                        tempo_total = primeiro_numero + segundo_numero
+                                    except:
+                                        tempo_total = -1
 
-                                    if index <= 2:
+                                    if index <= 2 and tempo_total > 0:
                                         if mandante:
                                             gols_mandante.append([tags_auxs[index],tempo_total,acrescimos])
                                         else:
                                             gols_visitante.append([tags_auxs[index],tempo_total,acrescimos])
-                                    else:
+                                    elif index > 2:
                                         if mandante:
                                             if index != 5:
                                                 cartoes_mandante.append([tags_auxs[index],tempo_total,acrescimos])
@@ -307,7 +317,7 @@ def extrair_dados_links(nome, ano):
                         
                         banco.salvar_jogo_no_banco(dados_jogo,database)
                     else:
-                        print("Já está no banco")      
+                        print(f"Jogo {nome_mandante} x {nome_visitante} já está no banco")      
                 except:
                     links_jogos_faltantes.append(link)
                     print("Erro ao buscar os dados")  
