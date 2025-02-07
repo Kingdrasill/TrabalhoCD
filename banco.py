@@ -168,8 +168,8 @@ def salvar_jogo_no_banco(dados_jogo, conn):
         raise
 
 def get_id_time(nome_time, cursor):
-    cursor.execute(f"""
+    cursor.execute("""
         SELECT id FROM times
-            WHERE nome = '{nome_time}'
-    """)
+        WHERE nome = ?
+    """, (nome_time,))
     return cursor.fetchone()
