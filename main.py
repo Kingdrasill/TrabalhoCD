@@ -5,12 +5,12 @@ import banco
 # Tipo do campeonato - 0 para mata mata, 1 para campeonatos de pontos corridos
 #test.extrair_campeonato('https://www.sofascore.com/pt/torneio/futebol/brazil/brasileirao-serie-a/325#id:58766', "Campeonato Brasileiro", 2024, 1)
 
-#test.extrair_campeonato("https://www.sofascore.com/pt/torneio/futebol/europe/uefa-champions-league/7#id:29267","Liga dos Campeões", 2021, 2)
-# test.extrair_dados_links("Liga dos Campeões", 2021)
+#test.extrair_campeonato("https://www.sofascore.com/pt/torneio/futebol/europe/uefa-europa-league/679#id:29343","Liga Europa", 2021, 2)
+test.extrair_dados_links("Liga Europa", 2021)
 
 # testar_banco.verificar_jogos_faltantes('bancos/Ligue 1 2022.db', id_campeonato=1, id_inicial=2, id_final=23)
 
-dados_jogo = {
+""" dados_jogo = {
     'id_mandante': 65,
     'id_visitante': 38,
     'faltas_mandante': -1,
@@ -31,4 +31,4 @@ dados_jogo = {
 
 database = banco.sqlite3.connect(f'bancos/Liga dos Campeões 2021.db')
 
-banco.salvar_jogo_no_banco(dados_jogo,database)
+banco.salvar_jogo_no_banco(dados_jogo,database) """

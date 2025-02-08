@@ -88,8 +88,8 @@ def salvar_jogo_no_banco(dados_jogo, conn):
             dados_jogo.get('escanteios_visitante')
         ])
 
-        if not tem_estatisticas:
-            raise ValueError("Nenhuma estatística relevante encontrada para salvar o jogo.")
+        #if not tem_estatisticas:
+        #    raise ValueError("Nenhuma estatística relevante encontrada para salvar o jogo.")
     
         cursor = conn.cursor()
 
