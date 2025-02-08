@@ -1,4 +1,5 @@
 import sqlite3
+import pandas as pd
 
 def criar_banco(nome):
     conn = sqlite3.connect(f'bancos/{nome}.db')
@@ -173,3 +174,52 @@ def get_id_time(nome_time, cursor):
         WHERE nome = ?
     """, (nome_time,))
     return cursor.fetchone()
+
+def get_id_campeonato(nome_campeonato, ano, cursor):
+    cursor.execute("""
+        SELECT id FROM campeonatos
+        WHERE (campeonatos.nome = ? AND campeonatos.ano = ?)
+    """, (nome_campeonato,ano))
+    return cursor.fetchone()
+
+def get_campeonatos():
+    conn = sqlite3.connect("banco_geral.db")
+    campeonatos = '''Select campeonatos.nome, campeonatos.ano FROM campeonatos'''
+    return pd.read_sql_query(campeonatos, conn)
+
+def get_gols(nome_campeonato, ano, tempo=0):
+    conn = sqlite3.connect("banco_geral.db")
+    if tempo == 0:
+        cursor = conn.cursor()
+        id_campeonato = get_id_campeonato(nome_campeonato,ano,cursor)[0]
+        gols_query = '''SELECT gols.tempo 
+        FROM gols
+        JOIN jogos ON gols.id_jogo = jogos.id
+        JOIN campeonatos ON jogos.id_campeonato = ?'''
+        return pd.read_sql_query(gols_query, conn, params=(id_campeonato,))
+    elif tempo == 1:
+        gols_primeiro_tempo_query = '''
+        SELECT gols.tempo
+        FROM gols
+        JOIN jogos ON gols.id_jogo = jogos.id
+        JOIN campeonatos ON jogos.id_campeonato = campeonatos.id
+        WHERE (campeonatos.nome = ? AND campeonatos.ano = ?)
+          AND (
+            (CAST(gols.tempo AS INTEGER) <= 45) 
+            OR (CAST(gols.tempo AS INTEGER) > 45 AND CAST(gols.tempo AS INTEGER) < 70 AND gols.acrescimos = 1)
+          )
+        '''
+        return pd.read_sql_query(gols_primeiro_tempo_query, conn, params=(nome_campeonato, ano))
+    else:
+        gols_segundo_tempo_query = '''
+        SELECT gols.tempo
+        FROM gols
+        JOIN jogos ON gols.id_jogo = jogos.id
+        JOIN campeonatos ON jogos.id_campeonato = campeonatos.id
+        WHERE (campeonatos.nome = ? AND campeonatos.ano = ?)
+          AND (
+            (CAST(gols.tempo AS INTEGER) > 45 AND CAST(gols.tempo AS INTEGER) <= 90) 
+            OR (CAST(gols.tempo AS INTEGER) > 90 AND gols.acrescimos = 1)
+          )
+        '''
+        return pd.read_sql_query(gols_segundo_tempo_query, conn, params=(nome_campeonato, ano))

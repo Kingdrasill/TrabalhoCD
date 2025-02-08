@@ -20,14 +20,8 @@ sys.stdout.reconfigure(encoding='utf-8')
 chrome_options = Options()
 chrome_options.add_argument("--start-maximized")
 
-def coletar_classificacao(driver, nome, ano, tipo, database):
+def coletar_classificacao(driver, database, id_campeonato):
     cursor = database.cursor()
-
-    cursor.execute('''
-        INSERT INTO campeonatos (nome, ano, tipo)
-        VALUES (?, ?, ?)
-    ''', (nome, ano, tipo))
-    id_campeonato = cursor.lastrowid
 
     conteudo_pagina = driver.page_source
 
@@ -119,8 +113,15 @@ def extrair_campeonato(link, nome, ano, tipo):
     driver.get(link)
     database = banco.sqlite3.connect(f'bancos/{nome_banco}.db')
     cursor = database.cursor()
+    cursor.execute('''
+        INSERT INTO campeonatos (nome, ano, tipo)
+        VALUES (?, ?, ?)
+    ''', (nome, ano, tipo))
+    database.commit()
+    id_campeonato = cursor.lastrowid
     if tipo == 1:
-        coletar_classificacao(driver, nome, ano, 1, database)
+        coletar_classificacao(driver, database, id_campeonato)
+        
     links_jogos = []
     while True:
         # Coleta os links dos jogos da rodada atual
