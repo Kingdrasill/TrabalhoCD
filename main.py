@@ -4,6 +4,7 @@ import banco
 # import extracao
 import juncao_banco
 import glob
+import plotar_graficos
 
 # Tipo do campeonato - 0 para mata mata, 1 para campeonatos de pontos corridos
 #test.extrair_campeonato('https://www.sofascore.com/pt/torneio/futebol/brazil/brasileirao-serie-a/325#id:58766', "Campeonato Brasileiro", 2024, 1)
@@ -25,9 +26,10 @@ import glob
 ## Juntar os bancos
 # banco.criar_banco("banco_geral")
 
-bancos_paths = glob.glob("bancos/*.db")
-for banco_path in bancos_paths:
-    juncao_banco.consolidar_banco(banco_path, "banco_geral.db")
-# juncao_banco.consolidar_banco("bancos/Campeonato Brasileiro 2024.db", "banco_geral.db")
-# juncao_banco.consolidar_banco("bancos/Campeonato Brasileiro 2023.db", "banco_geral.db")
-# juncao_banco.consolidar_banco("bancos/Liga dos Campeões 2024.db", "banco_geral.db")
+# bancos_paths = glob.glob("bancos/*.db")
+# for banco_path in bancos_paths:
+#     juncao_banco.consolidar_banco(banco_path, "banco_geral.db")
+
+# plotar_graficos.plotar_gols_minuto("bancos/La Liga 2021.db")
+
+plotar_graficos.plotar_gols_minuto("banco_geral.db")
