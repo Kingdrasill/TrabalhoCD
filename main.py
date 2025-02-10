@@ -70,7 +70,7 @@ import estatisticas
 #     print(f"Correlação A com B para intervalos de {i} minutos:")
 #     estatisticas.correlacao(grupo_A, grupo_B)
 
-# plotar_graficos.plot_gols_campeonatos("banco_geral.db",[("Campeonato Brasileiro", 2024),("Campeonato Brasileiro", 2023),("Campeonato Brasileiro", 2022),("Campeonato Brasileiro", 2021)],10)
+# plotar_graficos.plot_gols_campeonatos("banco_geral.db",[("Campeonato Brasileiro", 2024),("Campeonato Brasileiro", 2023),("Campeonato Brasileiro", 2022),("Campeonato Brasileiro", 2021)],5)
 
 # grupo_A = plotar_graficos.agrupar_por_intervalo(dados_A, melhor_i)
 # grupo_B = plotar_graficos.agrupar_por_intervalo(dados_B, melhor_i)
@@ -85,4 +85,5 @@ caminho_banco = "banco_geral.db"
 
 # plotar_graficos.plotar_gols_minuto_jogo_todo(caminho_banco, 1)
 # plotar_graficos.plotar_gols_tipo2_3(caminho_banco,1)
-plotar_graficos.plotar_media_gols_faltas(caminho_banco)
+# plotar_graficos.plotar_media_gols_faltas(caminho_banco)
+plotar_graficos.plotar_media_gols_por_cartoes_vermelhos(caminho_banco)

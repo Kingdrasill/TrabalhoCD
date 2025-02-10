@@ -612,3 +612,84 @@ def plotar_media_gols_faltas(caminho_banco):
 
     # Fechar a conexão com o banco de dados
     conn.close()
+
+def plotar_media_gols_por_cartoes(caminho_banco):
+    # Conexão com o banco de dados
+    conn = sqlite3.connect(caminho_banco)
+
+    # Consulta para obter os dados de gols por partida
+    query_gols = '''
+    SELECT id_jogo, COUNT(id_jogo) AS total_gols
+    FROM gols
+    GROUP BY id_jogo
+    '''
+    gols_df = pd.read_sql_query(query_gols, conn)
+
+    # Consulta para obter os dados de cartões por partida
+    query_cartoes = '''
+    SELECT id_jogo, COUNT(id) AS total_cartoes
+    FROM cartoes
+    GROUP BY id_jogo
+    '''
+    cartoes_df = pd.read_sql_query(query_cartoes, conn)
+
+    # Mesclar os dados de gols e cartões por partida, considerando jogos sem cartões
+    dados_df = pd.merge(gols_df, cartoes_df, on='id_jogo', how='left').fillna(0)
+    dados_df['total_cartoes'] = dados_df['total_cartoes'].astype(int)
+
+    # Agrupar por quantidade de cartões e calcular a média de gols
+    media_gols_por_cartoes = dados_df.groupby('total_cartoes')['total_gols'].mean().reset_index()
+
+    # Plotar o gráfico de linha
+    plt.figure(figsize=(10, 6))
+    plt.plot(media_gols_por_cartoes['total_cartoes'], media_gols_por_cartoes['total_gols'], marker='o', color='royalblue')
+    plt.title('Média de Gols por Quantidade de Cartões por Partida')
+    plt.xlabel('Quantidade de Cartões')
+    plt.ylabel('Média de Gols')
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.tight_layout()
+    plt.show()
+
+    # Fechar a conexão com o banco de dados
+    conn.close()
+
+def plotar_media_gols_por_cartoes_vermelhos(caminho_banco):
+    # Conexão com o banco de dados
+    conn = sqlite3.connect(caminho_banco)
+
+    # Consulta para obter os dados de gols por partida
+    query_gols = '''
+    SELECT id_jogo, COUNT(id_jogo) AS total_gols
+    FROM gols
+    GROUP BY id_jogo
+    '''
+    gols_df = pd.read_sql_query(query_gols, conn)
+
+    # Consulta para obter os dados de cartões por partida
+    query_cartoes = '''
+    SELECT id_jogo, COUNT(id) AS total_cartoes
+    FROM cartoes
+    WHERE tipo == 2
+    GROUP BY id_jogo
+    '''
+    cartoes_df = pd.read_sql_query(query_cartoes, conn)
+
+    # Mesclar os dados de gols e cartões por partida, considerando jogos sem cartões
+    dados_df = pd.merge(gols_df, cartoes_df, on='id_jogo', how='left').fillna(0)
+    dados_df['total_cartoes'] = dados_df['total_cartoes'].astype(int)
+
+    # Agrupar por quantidade de cartões e calcular a média de gols
+    media_gols_por_cartoes = dados_df.groupby('total_cartoes')['total_gols'].mean().reset_index()
+
+    # Plotar o gráfico de linha
+    plt.figure(figsize=(10, 6))
+    plt.plot(media_gols_por_cartoes['total_cartoes'], media_gols_por_cartoes['total_gols'], marker='o', color='royalblue')
+    plt.title('Média de Gols por Quantidade de Cartões Vermelhos por Partida')
+    plt.xlabel('Quantidade de Cartões Vermelhos')
+    plt.ylabel('Média de Gols')
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.tight_layout()
+    plt.show()
+
+    # Fechar a conexão com o banco de dados
+    conn.close()
